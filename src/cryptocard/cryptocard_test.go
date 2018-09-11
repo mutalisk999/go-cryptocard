@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 	"github.com/mutalisk999/go-lib/src/net/buffer_tcp"
+	"encoding/hex"
 )
 
 func Test_L1Request_L2Response(t *testing.T) {
@@ -35,6 +36,37 @@ func Test_L1Request_L2Response(t *testing.T) {
 	conn.TCPDisConnect()
 }
 
+func Test_L5Request_L6Response(t *testing.T) {
+	conn := new(buffer_tcp.BufferTcpConn)
+	err := conn.TCPConnect("192.168.1.188", 1818, 1)
+	if err != nil {
+		fmt.Println("connect error:" + err.Error())
+		return
+	}
+
+	var l5req L5Request
+	l5req.Set(100, 1)
+	fmt.Println("l5req size:", l5req.GetSize())
+	fmt.Println("l5req:", l5req)
+	err = l5req.Pack(conn)
+	if err != nil {
+		fmt.Println("send error:" + err.Error())
+	}
+
+	var l6resp L6Response
+	err = l6resp.UnPack(conn)
+	if err != nil {
+		fmt.Println("recv error:" + err.Error())
+	}
+	fmt.Println("l6resp:", l6resp)
+	fmt.Println("privKeyLen", len(l6resp.PrivKey))
+	fmt.Println("pubKeyLen", len(l6resp.PubKey))
+	fmt.Println("privKeyHex", hex.EncodeToString(l6resp.PrivKey))
+	fmt.Println("pubKeyHex", hex.EncodeToString(l6resp.PubKey))
+
+	conn.TCPDisConnect()
+}
+
 func Test_L7Request_L8Response(t *testing.T) {
 	conn := new(buffer_tcp.BufferTcpConn)
 	err := conn.TCPConnect("192.168.1.188", 1818, 1)
@@ -60,6 +92,36 @@ func Test_L7Request_L8Response(t *testing.T) {
 	fmt.Println("l8resp:", l8resp)
 	fmt.Println("dataSignedLen", len(l8resp.DataSigned))
 	fmt.Println("dataSigned", l8resp.DataSigned)
+
+	conn.TCPDisConnect()
+}
+
+func Test_L8Request_L9Response(t *testing.T) {
+	conn := new(buffer_tcp.BufferTcpConn)
+	err := conn.TCPConnect("192.168.1.188", 1818, 1)
+	if err != nil {
+		fmt.Println("connect error:" + err.Error())
+		return
+	}
+
+	var l8req L8Request
+	privKey, _ := hex.DecodeString("c7ffac95f626af074b62d4ef875640671837fe0c69136bfe722d0a3b5f6216cb3142bf3e22d216c2b2ca90a6652e01f97c31cdbe181cc3d794a9d50a64f1f82680ba622bba08dd651bd5bc8936603d2e38efcf2027ed8506a535813029c614e0318ece3becd350daca0819bf9346ff3fb855ed6a635722a294bbc802c647929b")
+	l8req.Set(9999, privKey)
+	fmt.Println("l8req size:", l8req.GetSize())
+	fmt.Println("l8req:", l8req)
+	err = l8req.Pack(conn)
+	if err != nil {
+		fmt.Println("send error:" + err.Error())
+	}
+
+	var l9resp L9Response
+	err = l9resp.UnPack(conn)
+	if err != nil {
+		fmt.Println("recv error:" + err.Error())
+	}
+	fmt.Println("l9resp:", l9resp)
+	fmt.Println("pubKeyLen", len(l9resp.PubKey))
+	fmt.Println("pubKeyHex", hex.EncodeToString(l9resp.PubKey))
 
 	conn.TCPDisConnect()
 }

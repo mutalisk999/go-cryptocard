@@ -7,6 +7,7 @@ import (
 	"strconv"
 )
 
+// create ecc priv/pub key pair
 type L1Request struct {
 	MsgHeader [8]byte
 	ReqCode   [2]byte
@@ -99,6 +100,7 @@ func (l *L2Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
 	return nil
 }
 
+// use ecc key to sign and verify data
 type L7Request struct {
 	MsgHeader [8]byte
 	ReqCode   [2]byte
@@ -211,6 +213,189 @@ func (l *L8Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
 	if len(l.DataSigned) != dataSignedLen {
 		return errors.New("error response, invalid dataSignedLen or dataSigned")
 	}
+	return nil
+}
+
+// import key
+type L8Request struct {
+	MsgHeader  [8]byte
+	ReqCode    [2]byte
+	KeyIndex   [4]byte
+	PrivKeyLen [4]byte
+	PrivKey    []byte
+}
+
+func (l *L8Request) Set(keyIndex uint16, privKey []byte) error {
+	l.MsgHeader = [8]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
+	l.ReqCode = [2]byte{'L', '8'}
+	if keyIndex == 0 || (keyIndex > 1024 && keyIndex < 9999) || keyIndex > 9999 {
+		return errors.New("invalid key index")
+	}
+	keyIndexStr := fmt.Sprintf("%04d", keyIndex)
+	copy(l.KeyIndex[0:], keyIndexStr)
+	privKeyLenStr := fmt.Sprintf("%04d", len(privKey))
+	copy(l.PrivKeyLen[0:], privKeyLenStr)
+	l.PrivKey = privKey
+	return nil
+}
+
+func (l L8Request) GetSize() uint16 {
+	return uint16(8 + 2 + 4 + 4 + len(l.PrivKey))
+}
+
+func (l L8Request) Pack(conn *buffer_tcp.BufferTcpConn) error {
+	var hb, lb byte
+	hb = byte((l.GetSize() & 0xFF00) >> 8)
+	lb = byte(l.GetSize() & 0xFF)
+	msgReq := make([]byte, 0, 2+l.GetSize())
+	msgReq = append(msgReq, hb, lb)
+	msgReq = append(msgReq, l.MsgHeader[:]...)
+	msgReq = append(msgReq, l.ReqCode[:]...)
+	msgReq = append(msgReq, l.KeyIndex[:]...)
+	msgReq = append(msgReq, l.PrivKeyLen[:]...)
+	msgReq = append(msgReq, l.PrivKey[:]...)
+	err := conn.TCPWrite(msgReq)
+	if err != nil {
+		return err
+	}
+	err = conn.TCPFlush()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type L9Response struct {
+	MsgSize    uint16
+	MsgHeader  [8]byte
+	RespCode   [2]byte
+	ErrCode    [2]byte
+	PubKeyLen [4]byte
+	PubKey     []byte
+}
+
+func (l *L9Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
+	bytesMsgSize, count, _, err := conn.TCPRead(2)
+	if err != nil {
+		return err
+	}
+	if count != 2 {
+		return errors.New("read bytesMsgSize, can not get enough bytes")
+	}
+	l.MsgSize = uint16(uint16(bytesMsgSize[0])*uint16(16) + uint16(bytesMsgSize[1]))
+	bytesMsg, count, _, err := conn.TCPRead(uint32(l.MsgSize))
+	if err != nil {
+		return err
+	}
+	if uint16(count) != l.MsgSize {
+		return errors.New("read L2 payload, can not get enough bytes")
+	}
+	copy(l.MsgHeader[:], bytesMsg[0:8])
+	copy(l.RespCode[:], bytesMsg[8:10])
+	if l.RespCode[0] != 'L' || l.RespCode[1] != '9' {
+		return errors.New("error response, RespCode:" + string(l.RespCode[:]))
+	}
+	copy(l.ErrCode[:], bytesMsg[10:12])
+	if l.ErrCode[0] != '0' || l.ErrCode[1] != '0' {
+		return errors.New("error response, ErrCode: " + string(l.ErrCode[:]))
+	}
+	if len(bytesMsg) >= 16 {
+		copy(l.PubKeyLen[:], bytesMsg[12:16])
+		l.PubKey = bytesMsg[16:]
+	}
+	return nil
+}
+
+// export key
+type L5Request struct {
+	MsgHeader [8]byte
+	ReqCode   [2]byte
+	KeyIndex  [4]byte
+	PubKeyFlag byte
+}
+
+func (l *L5Request) Set(keyIndex uint16, pubKeyFlag byte) error {
+	l.MsgHeader = [8]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
+	l.ReqCode = [2]byte{'L', '5'}
+	if keyIndex == 0 || keyIndex > 1024 {
+		return errors.New("invalid key index")
+	}
+	keyIndexStr := fmt.Sprintf("%04d", keyIndex)
+	copy(l.KeyIndex[0:], keyIndexStr)
+	if pubKeyFlag != 0 && pubKeyFlag != 1 {
+		return errors.New("invalid pub key flag")
+	}
+	l.PubKeyFlag = pubKeyFlag
+	return nil
+}
+
+func (l L5Request) GetSize() uint16 {
+	return uint16(8 + 2 + 4 + 1)
+}
+
+func (l L5Request) Pack(conn *buffer_tcp.BufferTcpConn) error {
+	var hb, lb byte
+	hb = byte((l.GetSize() & 0xFF00) >> 8)
+	lb = byte(l.GetSize() & 0xFF)
+	msgReq := make([]byte, 0, 2+l.GetSize())
+	msgReq = append(msgReq, hb, lb)
+	msgReq = append(msgReq, l.MsgHeader[:]...)
+	msgReq = append(msgReq, l.ReqCode[:]...)
+	msgReq = append(msgReq, l.KeyIndex[:]...)
+	msgReq = append(msgReq, l.PubKeyFlag + '0')
+	err := conn.TCPWrite(msgReq)
+	if err != nil {
+		return err
+	}
+	err = conn.TCPFlush()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type L6Response struct {
+	MsgSize    uint16
+	MsgHeader  [8]byte
+	RespCode   [2]byte
+	ErrCode    [2]byte
+	PrivKeyLen [4]byte
+	PrivKey    []byte
+	PubKey     []byte
+}
+
+func (l *L6Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
+	bytesMsgSize, count, _, err := conn.TCPRead(2)
+	if err != nil {
+		return err
+	}
+	if count != 2 {
+		return errors.New("read bytesMsgSize, can not get enough bytes")
+	}
+	l.MsgSize = uint16(uint16(bytesMsgSize[0])*uint16(16) + uint16(bytesMsgSize[1]))
+	bytesMsg, count, _, err := conn.TCPRead(uint32(l.MsgSize))
+	if err != nil {
+		return err
+	}
+	if uint16(count) != l.MsgSize {
+		return errors.New("read L6 payload, can not get enough bytes")
+	}
+	copy(l.MsgHeader[:], bytesMsg[0:8])
+	copy(l.RespCode[:], bytesMsg[8:10])
+	if l.RespCode[0] != 'L' || l.RespCode[1] != '6' {
+		return errors.New("error response, RespCode:" + string(l.RespCode[:]))
+	}
+	copy(l.ErrCode[:], bytesMsg[10:12])
+	if l.ErrCode[0] != '0' || l.ErrCode[1] != '0' {
+		return errors.New("error response, ErrCode: " + string(l.ErrCode[:]))
+	}
+	copy(l.PrivKeyLen[:], bytesMsg[12:16])
+	privLen, err := strconv.Atoi(string(l.PrivKeyLen[:]))
+	if err != nil {
+		return err
+	}
+	l.PrivKey = bytesMsg[16 : 16+privLen]
+	l.PubKey = bytesMsg[16+privLen:]
 	return nil
 }
 
