@@ -1,10 +1,10 @@
 package cryptocard
 
 import (
-	"fmt"
-	"testing"
-	"github.com/mutalisk999/go-lib/src/net/buffer_tcp"
 	"encoding/hex"
+	"fmt"
+	"github.com/mutalisk999/go-lib/src/net/buffer_tcp"
+	"testing"
 )
 
 func Test_L1Request_L2Response(t *testing.T) {

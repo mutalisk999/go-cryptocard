@@ -102,12 +102,12 @@ func (l *L2Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
 
 // use ecc key to sign and verify data
 type L7Request struct {
-	MsgHeader [8]byte
-	ReqCode   [2]byte
-	SigType   byte
-	KeyIndex  [4]byte
+	MsgHeader      [8]byte
+	ReqCode        [2]byte
+	SigType        byte
+	KeyIndex       [4]byte
 	PrivKeyOutSide []byte
-	DataSource  []byte
+	DataSource     []byte
 }
 
 func (l *L7Request) Set(sigType byte, keyIndex uint16, privKeyOutSide []byte, dataSource []byte) error {
@@ -171,12 +171,12 @@ func (l L7Request) Pack(conn *buffer_tcp.BufferTcpConn) error {
 }
 
 type L8Response struct {
-	MsgSize    uint16
-	MsgHeader  [8]byte
-	RespCode   [2]byte
-	ErrCode    [2]byte
+	MsgSize       uint16
+	MsgHeader     [8]byte
+	RespCode      [2]byte
+	ErrCode       [2]byte
 	DataSignedLen [4]byte
-	DataSigned   []byte
+	DataSigned    []byte
 }
 
 func (l *L8Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
@@ -266,12 +266,12 @@ func (l L8Request) Pack(conn *buffer_tcp.BufferTcpConn) error {
 }
 
 type L9Response struct {
-	MsgSize    uint16
-	MsgHeader  [8]byte
-	RespCode   [2]byte
-	ErrCode    [2]byte
+	MsgSize   uint16
+	MsgHeader [8]byte
+	RespCode  [2]byte
+	ErrCode   [2]byte
 	PubKeyLen [4]byte
-	PubKey     []byte
+	PubKey    []byte
 }
 
 func (l *L9Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
@@ -308,9 +308,9 @@ func (l *L9Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
 
 // export key
 type L5Request struct {
-	MsgHeader [8]byte
-	ReqCode   [2]byte
-	KeyIndex  [4]byte
+	MsgHeader  [8]byte
+	ReqCode    [2]byte
+	KeyIndex   [4]byte
 	PubKeyFlag byte
 }
 
@@ -342,7 +342,7 @@ func (l L5Request) Pack(conn *buffer_tcp.BufferTcpConn) error {
 	msgReq = append(msgReq, l.MsgHeader[:]...)
 	msgReq = append(msgReq, l.ReqCode[:]...)
 	msgReq = append(msgReq, l.KeyIndex[:]...)
-	msgReq = append(msgReq, l.PubKeyFlag + '0')
+	msgReq = append(msgReq, l.PubKeyFlag+'0')
 	err := conn.TCPWrite(msgReq)
 	if err != nil {
 		return err
@@ -398,4 +398,3 @@ func (l *L6Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
 	l.PubKey = bytesMsg[16+privLen:]
 	return nil
 }
-
