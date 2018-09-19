@@ -92,6 +92,36 @@ func Test_L7Request_L8Response(t *testing.T) {
 	fmt.Println("l8resp:", l8resp)
 	fmt.Println("dataSignedLen", len(l8resp.DataSigned))
 	fmt.Println("dataSigned", l8resp.DataSigned)
+	fmt.Println("dataSignedHex", hex.EncodeToString(l8resp.DataSigned))
+
+	conn.TCPDisConnect()
+}
+
+func Test_L4Request_L5Response(t *testing.T) {
+	conn := new(buffer_tcp.BufferTcpConn)
+	err := conn.TCPConnect("192.168.1.188", 1818, 1)
+	if err != nil {
+		fmt.Println("connect error:" + err.Error())
+		return
+	}
+
+	var l4req L4Request
+	dataSigned, _ := hex.DecodeString("3046022100eee55a6c3d6770262c3cc6782fc4ac4941c8e2f2cc0a40ff2b5ddb4bb9c089450221009894e946ff859acce0e7353fb3ffd5a8ef8dd4a760df5ab9aea651f3e19c8a99")
+	l4req.Set('2', 1, nil, nil, []byte("test"), dataSigned)
+	fmt.Println("l4req size:", l4req.GetSize())
+	fmt.Println("l4req:", l4req)
+	err = l4req.Pack(conn)
+	if err != nil {
+		fmt.Println("send error:" + err.Error())
+	}
+
+	var l5resp L5Response
+	err = l5resp.UnPack(conn)
+	if err != nil {
+		fmt.Println("recv error:" + err.Error())
+	}
+	fmt.Println("l5resp:", l5resp)
+	fmt.Println("l5resp errcode", l5resp.ErrCode)
 
 	conn.TCPDisConnect()
 }

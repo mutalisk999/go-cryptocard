@@ -216,6 +216,125 @@ func (l *L8Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
 	return nil
 }
 
+type L4Request struct {
+	MsgHeader      [8]byte
+	ReqCode        [2]byte
+	SigType        byte
+	KeyIndex       [4]byte
+	CurveType      [2]byte
+	PubKeyOutSide []byte
+	DataSource     []byte
+	DataSigned     []byte
+}
+
+func (l *L4Request) Set(sigType byte, keyIndex uint16, curveType []byte, pubKeyOutSide []byte, dataSource []byte, dataSigned []byte) error {
+	l.MsgHeader = [8]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
+	l.ReqCode = [2]byte{'L', '4'}
+	l.SigType = sigType
+	if keyIndex == 0 || (keyIndex > 1024 && keyIndex < 9999) || keyIndex > 9999 {
+		return errors.New("invalid key index")
+	}
+	keyIndexStr := fmt.Sprintf("%04d", keyIndex)
+	copy(l.KeyIndex[0:], keyIndexStr)
+	if keyIndex == 9999 {
+		if len(curveType) != 2 {
+			return errors.New("invalid curveType size")
+		} else if curveType[1] != 'T' {
+			return errors.New("invalid curveType")
+		} else {
+			copy(l.CurveType[0:], curveType)
+		}
+
+		if len(pubKeyOutSide) == 0 {
+			return errors.New("lack of pubKeyOutSide")
+		} else {
+			l.PubKeyOutSide = pubKeyOutSide
+		}
+	} else {
+		if len(pubKeyOutSide) != 0 {
+			return errors.New("should not set pubKeyOutSide")
+		}
+	}
+	l.DataSource = dataSource
+	l.DataSigned = dataSigned
+	return nil
+}
+
+func (l L4Request) GetSize() uint16 {
+	if string(l.KeyIndex[:]) != "9999" {
+		return uint16(8 + 2 + 1 + 4 + 4 + len(l.DataSource) + 4 + len(l.DataSigned))
+	}
+	return uint16(8 + 2 + 1 + 4 + 2 + 4 + len(l.PubKeyOutSide) + 4 + len(l.DataSource) + 4 + len(l.DataSigned))
+}
+
+func (l L4Request) Pack(conn *buffer_tcp.BufferTcpConn) error {
+	var hb, lb byte
+	hb = byte((l.GetSize() & 0xFF00) >> 8)
+	lb = byte(l.GetSize() & 0xFF)
+	msgReq := make([]byte, 0, 2+l.GetSize())
+	msgReq = append(msgReq, hb, lb)
+	msgReq = append(msgReq, l.MsgHeader[:]...)
+	msgReq = append(msgReq, l.ReqCode[:]...)
+	msgReq = append(msgReq, l.SigType)
+	msgReq = append(msgReq, l.KeyIndex[:]...)
+	if string(l.KeyIndex[:]) == "9999" {
+		msgReq = append(msgReq, l.CurveType[:]...)
+		privKeyOutSideLenStr := fmt.Sprintf("%04d", len(l.PubKeyOutSide))
+		msgReq = append(msgReq, []byte(privKeyOutSideLenStr)...)
+		msgReq = append(msgReq, l.PubKeyOutSide...)
+	}
+	dataSourceLenStr := fmt.Sprintf("%04d", len(l.DataSource))
+	msgReq = append(msgReq, []byte(dataSourceLenStr)...)
+	msgReq = append(msgReq, l.DataSource...)
+	dataSignedLenStr := fmt.Sprintf("%04d", len(l.DataSigned))
+	msgReq = append(msgReq, []byte(dataSignedLenStr)...)
+	msgReq = append(msgReq, l.DataSigned...)
+	err := conn.TCPWrite(msgReq)
+	if err != nil {
+		return err
+	}
+	err = conn.TCPFlush()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type L5Response struct {
+	MsgSize       uint16
+	MsgHeader     [8]byte
+	RespCode      [2]byte
+	ErrCode       [2]byte
+}
+
+func (l *L5Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
+	bytesMsgSize, count, _, err := conn.TCPRead(2)
+	if err != nil {
+		return err
+	}
+	if count != 2 {
+		return errors.New("read bytesMsgSize, can not get enough bytes")
+	}
+	l.MsgSize = uint16(uint16(bytesMsgSize[0])*uint16(16) + uint16(bytesMsgSize[1]))
+	bytesMsg, count, _, err := conn.TCPRead(uint32(l.MsgSize))
+	if err != nil {
+		return err
+	}
+	if uint16(count) != l.MsgSize {
+		return errors.New("read L8 payload, can not get enough bytes")
+	}
+	copy(l.MsgHeader[:], bytesMsg[0:8])
+	copy(l.RespCode[:], bytesMsg[8:10])
+	if l.RespCode[0] != 'L' || l.RespCode[1] != '5' {
+		return errors.New("error response, RespCode:" + string(l.RespCode[:]))
+	}
+	copy(l.ErrCode[:], bytesMsg[10:12])
+	if l.ErrCode[0] != '0' || l.ErrCode[1] != '0' {
+		return errors.New("error response, ErrCode: " + string(l.ErrCode[:]))
+	}
+	return nil
+}
+
 // import key
 type L8Request struct {
 	MsgHeader  [8]byte
