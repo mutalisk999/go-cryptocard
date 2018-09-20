@@ -239,7 +239,7 @@ func (l *L4Request) Set(sigType byte, keyIndex uint16, curveType []byte, pubKeyO
 	if keyIndex == 9999 {
 		if len(curveType) != 2 {
 			return errors.New("invalid curveType size")
-		} else if curveType[1] != 'T' {
+		} else if curveType[0] != 'T' {
 			return errors.New("invalid curveType")
 		} else {
 			copy(l.CurveType[0:], curveType)
