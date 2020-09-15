@@ -1,8 +1,8 @@
 package cryptocard
 
 import (
+	"errors"
 	"fmt"
-	"github.com/kataras/iris/core/errors"
 	"github.com/mutalisk999/go-lib/src/net/buffer_tcp"
 	"strconv"
 )
@@ -217,14 +217,14 @@ func (l *L8Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
 }
 
 type L4Request struct {
-	MsgHeader      [8]byte
-	ReqCode        [2]byte
-	SigType        byte
-	KeyIndex       [4]byte
-	CurveType      [2]byte
+	MsgHeader     [8]byte
+	ReqCode       [2]byte
+	SigType       byte
+	KeyIndex      [4]byte
+	CurveType     [2]byte
 	PubKeyOutSide []byte
-	DataSource     []byte
-	DataSigned     []byte
+	DataSource    []byte
+	DataSigned    []byte
 }
 
 func (l *L4Request) Set(sigType byte, keyIndex uint16, curveType []byte, pubKeyOutSide []byte, dataSource []byte, dataSigned []byte) error {
@@ -301,10 +301,10 @@ func (l L4Request) Pack(conn *buffer_tcp.BufferTcpConn) error {
 }
 
 type L5Response struct {
-	MsgSize       uint16
-	MsgHeader     [8]byte
-	RespCode      [2]byte
-	ErrCode       [2]byte
+	MsgSize   uint16
+	MsgHeader [8]byte
+	RespCode  [2]byte
+	ErrCode   [2]byte
 }
 
 func (l *L5Response) UnPack(conn *buffer_tcp.BufferTcpConn) error {
